@@ -15,7 +15,3 @@ dict_1 = {str(key): value for key, value in dict_1.items()}
 # Запись словаря в json-файл
 with open('dictionary.json', 'w') as file:
     json.dump(dict_1, file)
-
-import os
-
-print(os.getcwd())
