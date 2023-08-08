@@ -12,9 +12,10 @@ class Person:
         self.sex = sex
 
     @property
-    def death_age(self):
-        if self.birth_date and self.death_date:
-            return self.death_date.year - self.birth_date.year - ((self.death_date.month, self.death_date.day) < (self.birth_date.month, self.birth_date.day))
+    def age(self):
+        if self.birth_date:
+            end_date = self.death_date or datetime.datetime.now()
+            return end_date.year - self.birth_date.year - ((end_date.month, end_date.day) < (self.birth_date.month, self.birth_date.day))
         return None
 
 class DB:
@@ -104,52 +105,45 @@ class DB:
                 gender_str = 'мужчина' if r.sex == 'm' else 'женщина' if r.sex == 'f' else 'не бинарная личность'
                 birth_or_date = 'дата рождения' if r.sex == 'o' else 'родился' if r.sex == 'm' else 'родилась'
                 death_or_date = 'дата смерти' if r.sex == 'o' else 'умер' if r.sex == 'm' else 'умерла'
-                print(f"{r.first_name} {r.last_name or ''} {r.middle_name or ''}, {r.death_age or ''}, {gender_str}. {birth_or_date}: {birth_date_str}, {death_or_date}: {death_date_str}")
+                age_label = 'возраст' if r.death_date is None else 'возраст на момент смерти'
+                print(f"{r.first_name} {r.last_name or ''} {r.middle_name or ''}, {age_label}: {r.age}, {gender_str}. {birth_or_date}: {birth_date_str}, {death_or_date}: {death_date_str}")
 
     def save_to_file(self):
-        filename = input("Введите имя файла для сохранения данных: ")
-        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-            fieldnames = ["first_name", "last_name", "middle_name", "birth_date", "death_date", "sex"]
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        file_name = 'database.csv'
+        with open(file_name, mode='w', newline='', encoding='utf-8') as file:
+            fieldnames = ['id', 'first_name', 'last_name', 'middle_name', 'birth_date', 'death_date', 'sex']
+            writer = csv.DictWriter(file, fieldnames=fieldnames, extrasaction='ignore')
 
             writer.writeheader()
-            for person in self.data.values():
-                writer.writerow(self.csv_encoder(person))
+            for id, person in self.data.items():
+                writer.writerow({
+                    'id': id,
+                    'first_name': person.first_name,
+                    'last_name': person.last_name,
+                    'middle_name': person.middle_name,
+                    'birth_date': person.birth_date.strftime('%d.%m.%Y') if person.birth_date else '',
+                    'death_date': person.death_date.strftime('%d.%m.%Y') if person.death_date else '',
+                    'sex': person.sex
+                })
+        print(f"Данные сохранены в {file_name}")
 
     def load_from_file(self):
-        filename = input("Введите имя файла для загрузки данных: ")
-        try:
-            with open(filename, 'r', encoding='utf-8') as csvfile:
-                reader = csv.DictReader(csvfile)
-                self.data = {}
-                for i, row in enumerate(reader, start=1):
-                    self.data[i] = Person(
-                        row["first_name"],
-                        row["last_name"],
-                        row["middle_name"],
-                        datetime.datetime.strptime(row["birth_date"], '%d.%m.%Y') if row["birth_date"] != '' else None,
-                        datetime.datetime.strptime(row["death_date"], '%d.%m.%Y') if row["death_date"] != '' else None,
-                        row["sex"],
-                    )
-            print("Данные успешно загружены.")
-        except FileNotFoundError:
-            print("Файл не найден.")
-        except csv.Error:
-            print("Неверный формат файла.")
+        file_name = 'database.csv'
+        with open(file_name, mode='r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            self.data = {}
+            for row in reader:
+                self.data[int(row['id'])] = Person(row['first_name'], row['last_name'], row['middle_name'],
+                                                   self.str_to_date(row['birth_date']) if row['birth_date'] else None,
+                                                   self.str_to_date(row['death_date']) if row['death_date'] else None,
+                                                   row['sex'])
+        print(f"Данные загружены из {file_name}")
 
     @staticmethod
     def csv_encoder(obj):
-        if isinstance(obj, Person):
-            return {
-                "first_name": obj.first_name,
-                "last_name": obj.last_name,
-                "middle_name": obj.middle_name,
-                "birth_date": obj.birth_date.strftime('%d.%m.%Y') if obj.birth_date else '',
-                "death_date": obj.death_date.strftime('%d.%m.%Y') if obj.death_date else '',
-                "sex": obj.sex,
-            }
-        else:
-            raise TypeError("Object of type '%s' is not serializable" % type(obj).__name__)
+        if isinstance(obj, datetime.datetime):
+            return obj.strftime('%d.%m.%Y')
+        return str(obj)
 
 def main():
     db = DB()
